@@ -256,9 +256,7 @@ def normalize_data(df):
 # =========================================================
 
 def load_data():
-
     try:
-
         result = (
             supabase
             .table("app_data")
@@ -267,152 +265,73 @@ def load_data():
             .execute()
         )
 
-        # ---------------------------------------------
-        # データが存在しない
-        # ---------------------------------------------
-
         if not result.data:
-
             return create_initial_data()
 
-        # ---------------------------------------------
-        # data取得
-        # ---------------------------------------------
-
-        saved_data = (
-            result.data[0].get("data")
-        )
-
-        # ---------------------------------------------
-        # None / 空
-        # ---------------------------------------------
+        saved_data = result.data[0].get("data")
 
         if not saved_data:
-
             return create_initial_data()
 
-        # ---------------------------------------------
-        # 1. 辞書型
-        # ---------------------------------------------
-
-        if isinstance(
-            saved_data,
-            dict
-        ):
-
-            # 初期状態
-            if saved_data.get(
-                "initialized"
-            ) is True:
-
+        if isinstance(saved_data, dict):
+            if saved_data.get("initialized") is True:
                 return create_initial_data()
-
-            # 辞書1件
-            df = pd.DataFrame(
-                [saved_data]
-            )
-
-        # ---------------------------------------------
-        # 2. リスト型
-        # ---------------------------------------------
-
-        elif isinstance(
-            saved_data,
-            list
-        ):
-
+            df = pd.DataFrame([saved_data])
+        elif isinstance(saved_data, list):
             if len(saved_data) == 0:
-
                 return create_initial_data()
-
-            df = pd.DataFrame(
-                saved_data
-            )
-
-        # ---------------------------------------------
-        # 3. その他
-        # ---------------------------------------------
-
+            df = pd.DataFrame(saved_data)
         else:
-
             return create_initial_data()
 
         return normalize_data(df)
 
     except Exception as e:
-
-        st.error(
-            f"Supabaseからの読み込みに失敗しました。\n\n{e}"
-        )
-
+        st.error(f"データ読み込みエラー: {e}")
         return create_initial_data()
 
 
-# =========================================================
-# Supabaseへ保存
-# =========================================================
-
 def save_data(df):
-
     try:
+        df = normalize_data(df)
+        data = [] if (df is None or df.empty) else df.to_dict(orient="records")
 
-        df = normalize_data(
-            df
-        )
-
-        data = df.to_dict(
-            orient="records"
-        )
-
-        (
-            supabase
-            .table("app_data")
-            .upsert(
-                {
-                    "id": 1,
-                    "data": data
-                }
-            )
-            .execute()
-        )
-
+        supabase.table("app_data").upsert(
+            {
+                "id": 1,
+                "data": data
+            }
+        ).execute()
         return True
-
     except Exception as e:
-
-        st.error(
-            f"Supabaseへの保存に失敗しました。\n\n{e}"
-        )
-
+        st.error(f"データ保存エラー: {e}")
         return False
 
 
 # =========================================================
-# 起動時だけSupabaseから読み込み
+# 起動時読み込み & データの正規化
 # =========================================================
 
 if (
-    "loaded_from_supabase"
-    not in st.session_state
-    or
-    "df"
-    not in st.session_state
+    "loaded_from_supabase" not in st.session_state
+    or "df" not in st.session_state
 ):
-
     st.session_state.df = load_data()
-
     st.session_state.loaded_from_supabase = True
 
+st.session_state.df = normalize_data(st.session_state.df)
+
 
 # =========================================================
-# 取得したデータを正規化
+# 保存ボタン処理
 # =========================================================
 
-st.session_state.df = normalize_data(
-    st.session_state.df
-)
-
-
+if st.sidebar.button("💾 データを保存"):
+    if "df" in st.session_state and st.session_state.df is not None:
+        if save_data(st.session_state.df):
+            st.sidebar.success("保存しました。")
+    else:
+        st.sidebar.warning("保存するデータがありません。")
 # =========================================================
 # サイドバー
 # =========================================================
