@@ -321,17 +321,6 @@ if (
 
 st.session_state.df = normalize_data(st.session_state.df)
 
-
-# =========================================================
-# 保存ボタン処理
-# =========================================================
-
-if st.sidebar.button("💾 データを保存"):
-    if "df" in st.session_state and st.session_state.df is not None:
-        if save_data(st.session_state.df):
-            st.sidebar.success("保存しました。")
-    else:
-        st.sidebar.warning("保存するデータがありません。")
 # =========================================================
 # サイドバー
 # =========================================================
