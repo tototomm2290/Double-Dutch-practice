@@ -209,13 +209,11 @@ def normalize_data(df):
 
 
 # =========================================================
-# Supabaseから読み込み
+# # =========================================================
+# Supabaseから読み込み（型判定を強化した修正版）
 # =========================================================
-
 def load_data():
-
     try:
-
         result = (
             supabase
             .table("app_data")
@@ -226,84 +224,47 @@ def load_data():
 
         # データが存在しない場合
         if not result.data:
-
             return create_initial_data()
 
-        saved_data = result.data[0]["data"]
+        saved_data = result.data[0].get("data")
 
-        # 初期データしかない場合
-        if (
-            isinstance(saved_data, dict)
-            and saved_data.get(
-                "initialized"
-            ) is True
-        ):
-
+        # データが None や空の場合
+        if not saved_data:
             return create_initial_data()
 
-        df = pd.DataFrame(
-            saved_data
-        )
+        # 1. 辞書型（dict）の場合
+        if isinstance(saved_data, dict):
+            if saved_data.get("initialized") is True:
+                return create_initial_data()
+            # 辞書単体の場合は [ ] で囲んでリスト化する
+            df = pd.DataFrame([saved_data])
+
+        # 2. リスト型（list）の場合
+        elif isinstance(saved_data, list):
+            if len(saved_data) == 0:
+                return create_initial_data()
+            df = pd.DataFrame(saved_data)
+
+        # 3. 想定外の型の場合
+        else:
+            return create_initial_data()
 
         return normalize_data(df)
 
     except Exception as e:
-
-        st.error(
-            f"データ読み込みエラー: {e}"
-        )
-
+        st.error(f"データ読み込みエラー: {e}")
         return create_initial_data()
-
-
-# =========================================================
-# Supabaseへ保存
-# =========================================================
-
-def save_data(df):
-
-    try:
-
-        df = normalize_data(df)
-
-        data = df.to_dict(
-            orient="records"
-        )
-
-        result = (
-            supabase
-            .table("app_data")
-            .upsert(
-                {
-                    "id": 1,
-                    "data": data
-                }
-            )
-            .execute()
-        )
-
-        return True
-
-    except Exception as e:
-
-        st.error(
-            f"データ保存エラー: {e}"
-        )
-
-        return False
 
 
 # =========================================================
 # 起動時だけSupabaseから読み込み
 # =========================================================
-
-if "loaded_from_supabase" not in st.session_state:
-
+if "loaded_from_supabase" not in st.session_state or "df" not in st.session_state:
     st.session_state.df = load_data()
-
     st.session_state.loaded_from_supabase = True
 
-
+# 取得したデータを安全に正規化
+st.session_state.df = normalize_data(st.session_state.df)
 # =========================================================
 # データ整理
 # =========================================================
