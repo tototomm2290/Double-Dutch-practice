@@ -22,14 +22,11 @@ st.title("📊 ○×試行管理表")
 
 ITEM_COL = "項目名"
 TYPE_COL = "種類"
-PERCENT_COL = "○割合"
-O_COUNT_COL = "○の数"
-TRIAL_COUNT_COL = "全体試行回数"
 MEMO = "メモ"
 
 
 # =========================================================
-# 初期データ作成
+# 初期データ
 # =========================================================
 
 def create_initial_data(
@@ -48,57 +45,22 @@ def create_initial_data(
     columns = (
         [ITEM_COL, TYPE_COL]
         + trial_columns
-        + [
-            O_COUNT_COL,
-            TRIAL_COUNT_COL,
-            PERCENT_COL
-        ]
     )
 
     rows = []
 
     for i in range(item_count):
 
-        # -----------------------------
         # 判定行
-        # -----------------------------
-
         choice_row = {
-            ITEM_COL:
-                f"項目{i + 1}",
-
-            TYPE_COL:
-                "判定",
-
-            O_COUNT_COL:
-                0,
-
-            TRIAL_COUNT_COL:
-                trial_count,
-
-            PERCENT_COL:
-                0.0
+            ITEM_COL: f"項目{i + 1}",
+            TYPE_COL: "判定"
         }
 
-        # -----------------------------
         # メモ行
-        # -----------------------------
-
         memo_row = {
-            ITEM_COL:
-                MEMO,
-
-            TYPE_COL:
-                MEMO,
-
-            O_COUNT_COL:
-                "",
-
-            TRIAL_COUNT_COL:
-                "",
-
-            PERCENT_COL:
-                ""
+            ITEM_COL: MEMO,
+            TYPE_COL: MEMO
         }
 
         for col in trial_columns:
@@ -127,17 +89,21 @@ if "df" not in st.session_state:
 
 
 # =========================================================
-# 試行列取得
+# 試行列を取得
 # =========================================================
 
 def get_trial_columns(df):
 
+    result = []
+
+    for column in df.columns:
+
+        if str(column).isdigit():
+
+            result.append(str(column))
+
     return sorted(
-        [
-            str(col)
-            for col in df.columns
-            if str(col).isdigit()
-        ],
+        result,
         key=lambda x: int(x)
     )
 
@@ -150,7 +116,7 @@ def normalize_data(df):
 
     df = df.copy()
 
-    # 不要な列を削除
+    # 不要列削除
     df = df.drop(
         columns=[
             "index",
@@ -159,32 +125,38 @@ def normalize_data(df):
         errors="ignore"
     )
 
-    # 必須列
+    # 項目名
     if ITEM_COL not in df.columns:
-        df[ITEM_COL] = ""
 
+        df.insert(
+            0,
+            ITEM_COL,
+            ""
+        )
+
+    # 種類
     if TYPE_COL not in df.columns:
-        df[TYPE_COL] = ""
 
-    if O_COUNT_COL not in df.columns:
-        df[O_COUNT_COL] = 0
-
-    if TRIAL_COUNT_COL not in df.columns:
-        df[TRIAL_COUNT_COL] = 0
-
-    if PERCENT_COL not in df.columns:
-        df[PERCENT_COL] = 0.0
+        df.insert(
+            1,
+            TYPE_COL,
+            ""
+        )
 
     # 試行列
-    trial_columns = get_trial_columns(df)
+    trial_columns = (
+        get_trial_columns(df)
+    )
 
     if not trial_columns:
 
         df["1"] = ""
 
-    trial_columns = get_trial_columns(df)
+    trial_columns = (
+        get_trial_columns(df)
+    )
 
-    # ○×以外は空欄
+    # ○×以外を空欄にする
     for col in trial_columns:
 
         df[col] = (
@@ -204,7 +176,7 @@ def normalize_data(df):
             else ""
         )
 
-    # 判定行 / メモ行
+    # 判定 / メモ
     for row in range(len(df)):
 
         if row % 2 == 0:
@@ -214,14 +186,17 @@ def normalize_data(df):
                 TYPE_COL
             ] = "判定"
 
-            item = str(
+            current = str(
                 df.at[
                     row,
                     ITEM_COL
                 ]
             )
 
-            if item.strip() == "":
+            if (
+                current.strip() == ""
+                or current == "nan"
+            ):
 
                 df.at[
                     row,
@@ -243,127 +218,29 @@ def normalize_data(df):
             ] = MEMO
 
     # 列順
-    trial_columns = get_trial_columns(df)
+    trial_columns = (
+        get_trial_columns(df)
+    )
 
-    ordered_columns = (
+    columns = (
         [ITEM_COL, TYPE_COL]
         + trial_columns
-        + [
-            O_COUNT_COL,
-            TRIAL_COUNT_COL,
-            PERCENT_COL
-        ]
     )
 
-    for col in ordered_columns:
-
-        if col not in df.columns:
-            df[col] = ""
-
-    return df[
-        ordered_columns
-    ]
+    return df[columns]
 
 
 # =========================================================
-# 割合・○の数・全体回数を計算
-# =========================================================
-
-def calculate_summary(df):
-
-    df = df.copy()
-
-    trial_columns = get_trial_columns(df)
-
-    if not trial_columns:
-
-        return df
-
-    # 1行目の数字の最大値
-    max_trial = max(
-        int(col)
-        for col in trial_columns
-    )
-
-    for row in range(
-        0,
-        len(df),
-        2
-    ):
-
-        # ○の数
-        o_count = 0
-
-        for col in trial_columns:
-
-            if (
-                df.at[
-                    row,
-                    col
-                ] == "○"
-            ):
-
-                o_count += 1
-
-        # ○の数
-        df.at[
-            row,
-            O_COUNT_COL
-        ] = o_count
-
-        # 全体試行回数
-        df.at[
-            row,
-            TRIAL_COUNT_COL
-        ] = max_trial
-
-        # ○割合
-        if max_trial > 0:
-
-            percentage = (
-                o_count /
-                max_trial
-            ) * 100
-
-        else:
-
-            percentage = 0.0
-
-        df.at[
-            row,
-            PERCENT_COL
-        ] = percentage
-
-        # メモ行
-        if row + 1 < len(df):
-
-            df.at[
-                row + 1,
-                O_COUNT_COL
-            ] = ""
-
-            df.at[
-                row + 1,
-                TRIAL_COUNT_COL
-            ] = ""
-
-            df.at[
-                row + 1,
-                PERCENT_COL
-            ] = ""
-
-    return df
-
-
-# =========================================================
-# 最後の列に入力されたら自動追加
+# 最後の列を使用したら自動追加
 # =========================================================
 
 def auto_add_trial_column(df):
 
     df = df.copy()
 
-    trial_columns = get_trial_columns(df)
+    trial_columns = (
+        get_trial_columns(df)
+    )
 
     if not trial_columns:
 
@@ -373,6 +250,7 @@ def auto_add_trial_column(df):
 
     last_column = trial_columns[-1]
 
+    # 最後の列に入力があるか
     used = (
         df[last_column]
         .astype(str)
@@ -393,7 +271,7 @@ def auto_add_trial_column(df):
 
 
 # =========================================================
-# 最後の項目に入力されたら自動追加
+# 最後の項目を使用したら自動追加
 # =========================================================
 
 def auto_add_item(df):
@@ -404,9 +282,13 @@ def auto_add_item(df):
 
         return df
 
-    last_choice_row = len(df) - 2
+    last_choice_row = (
+        len(df) - 2
+    )
 
-    trial_columns = get_trial_columns(df)
+    trial_columns = (
+        get_trial_columns(df)
+    )
 
     used = False
 
@@ -433,7 +315,7 @@ def auto_add_item(df):
         used = True
 
     # -----------------------------
-    # 判定
+    # ○ / ×
     # -----------------------------
 
     if not used:
@@ -473,30 +355,21 @@ def auto_add_item(df):
                 break
 
     # -----------------------------
-    # 新しい項目を追加
+    # 行追加
     # -----------------------------
 
     if used:
 
-        new_item_number = (
+        item_number = (
             len(df) // 2 + 1
         )
 
         choice = {
             ITEM_COL:
-                f"項目{new_item_number}",
+                f"項目{item_number}",
 
             TYPE_COL:
-                "判定",
-
-            O_COUNT_COL:
-                0,
-
-            TRIAL_COUNT_COL:
-                0,
-
-            PERCENT_COL:
-                0.0
+                "判定"
         }
 
         memo = {
@@ -504,16 +377,7 @@ def auto_add_item(df):
                 MEMO,
 
             TYPE_COL:
-                MEMO,
-
-            O_COUNT_COL:
-                "",
-
-            TRIAL_COUNT_COL:
-                "",
-
-            PERCENT_COL:
-                ""
+                MEMO
         }
 
         for col in trial_columns:
@@ -541,12 +405,10 @@ def auto_add_item(df):
 # 初期データ整理
 # =========================================================
 
-st.session_state.df = normalize_data(
-    st.session_state.df
-)
-
-st.session_state.df = calculate_summary(
-    st.session_state.df
+st.session_state.df = (
+    normalize_data(
+        st.session_state.df
+    )
 )
 
 
@@ -567,7 +429,9 @@ if st.sidebar.button(
 
     df = st.session_state.df.copy()
 
-    trial_columns = get_trial_columns(df)
+    trial_columns = (
+        get_trial_columns(df)
+    )
 
     item_number = (
         len(df) // 2 + 1
@@ -578,22 +442,7 @@ if st.sidebar.button(
             f"項目{item_number}",
 
         TYPE_COL:
-            "判定",
-
-        O_COUNT_COL:
-            0,
-
-        TRIAL_COUNT_COL:
-            max(
-                [
-                    int(c)
-                    for c in trial_columns
-                ],
-                default=0
-            ),
-
-        PERCENT_COL:
-            0.0
+            "判定"
     }
 
     memo = {
@@ -601,16 +450,7 @@ if st.sidebar.button(
             MEMO,
 
         TYPE_COL:
-            MEMO,
-
-        O_COUNT_COL:
-            "",
-
-        TRIAL_COUNT_COL:
-            "",
-
-        PERCENT_COL:
-            ""
+            MEMO
     }
 
     for col in trial_columns:
@@ -648,14 +488,16 @@ if st.sidebar.button(
 
     df = st.session_state.df.copy()
 
-    trial_columns = get_trial_columns(df)
+    trial_columns = (
+        get_trial_columns(df)
+    )
 
     if trial_columns:
 
         new_column = str(
             max(
-                int(c)
-                for c in trial_columns
+                int(col)
+                for col in trial_columns
             ) + 1
         )
 
@@ -696,9 +538,10 @@ st.sidebar.subheader(
 )
 
 uploaded_file = st.sidebar.file_uploader(
-    "Excelファイル",
+    "Excelファイルを選択",
     type=["xlsx"]
 )
+
 
 if uploaded_file is not None:
 
@@ -713,11 +556,10 @@ if uploaded_file is not None:
                 sheet_name=0
             )
 
-            # 数字の列だけ試行列として認識
             trial_columns = [
-                str(col)
-                for col in excel_df.columns
-                if str(col).isdigit()
+                str(column)
+                for column in excel_df.columns
+                if str(column).isdigit()
             ]
 
             if not trial_columns:
@@ -728,41 +570,62 @@ if uploaded_file is not None:
 
             else:
 
-                new_rows = []
+                rows = []
 
-                for i in range(
+                for row_index in range(
                     len(excel_df)
                 ):
 
-                    data = {
-                        ITEM_COL:
-                            excel_df.iloc[
-                                i,
-                                0
-                            ]
-                            if len(
-                                excel_df.columns
-                            ) > 0
-                            else ""
-                    }
+                    row_data = {}
 
+                    # A列
+                    first_value = (
+                        excel_df.iloc[
+                            row_index,
+                            0
+                        ]
+                    )
+
+                    if pd.isna(
+                        first_value
+                    ):
+
+                        first_value = ""
+
+                    row_data[
+                        ITEM_COL
+                    ] = str(first_value)
+
+                    # 種類
+                    if row_index % 2 == 0:
+
+                        row_data[
+                            TYPE_COL
+                        ] = "判定"
+
+                    else:
+
+                        row_data[
+                            TYPE_COL
+                        ] = MEMO
+
+                        row_data[
+                            ITEM_COL
+                        ] = MEMO
+
+                    # 試行
                     for col in trial_columns:
 
-                        # 列名からExcelの列位置を取得
-                        col_index = (
-                            excel_df.columns
-                            .tolist()
-                            .index(col)
-                        )
-
                         value = (
-                            excel_df.iloc[
-                                i,
-                                col_index
+                            excel_df.loc[
+                                row_index,
+                                col
                             ]
                         )
 
-                        if pd.isna(value):
+                        if pd.isna(
+                            value
+                        ):
 
                             value = ""
 
@@ -776,66 +639,18 @@ if uploaded_file is not None:
 
                             value = ""
 
-                        data[col] = value
+                        row_data[
+                            col
+                        ] = value
 
-                    new_rows.append(data)
-
-                imported_df = pd.DataFrame(
-                    new_rows
-                )
-
-                # 判定 / メモ
-                imported_df[TYPE_COL] = ""
-
-                for i in range(
-                    len(imported_df)
-                ):
-
-                    if i % 2 == 0:
-
-                        imported_df.at[
-                            i,
-                            TYPE_COL
-                        ] = "判定"
-
-                    else:
-
-                        imported_df.at[
-                            i,
-                            TYPE_COL
-                        ] = MEMO
-
-                        imported_df.at[
-                            i,
-                            ITEM_COL
-                        ] = MEMO
-
-                imported_df[
-                    O_COUNT_COL
-                ] = 0
-
-                imported_df[
-                    TRIAL_COUNT_COL
-                ] = 0
-
-                imported_df[
-                    PERCENT_COL
-                ] = 0.0
-
-                imported_df = (
-                    normalize_data(
-                        imported_df
+                    rows.append(
+                        row_data
                     )
-                )
-
-                imported_df = (
-                    calculate_summary(
-                        imported_df
-                    )
-                )
 
                 st.session_state.df = (
-                    imported_df
+                    normalize_data(
+                        pd.DataFrame(rows)
+                    )
                 )
 
                 st.sidebar.success(
@@ -863,23 +678,19 @@ df = auto_add_item(df)
 
 df = auto_add_trial_column(df)
 
-df = calculate_summary(df)
-
 st.session_state.df = df
-
-
-# =========================================================
-# 試行列
-# =========================================================
-
-trial_columns = get_trial_columns(
-    st.session_state.df
-)
 
 
 # =========================================================
 # 表設定
 # =========================================================
+
+trial_columns = (
+    get_trial_columns(
+        st.session_state.df
+    )
+)
+
 
 column_config = {
 
@@ -894,36 +705,11 @@ column_config = {
             "種類",
             disabled=True,
             width="small"
-        ),
-
-    O_COUNT_COL:
-        st.column_config.NumberColumn(
-            "○の数",
-            disabled=True,
-            width="small"
-        ),
-
-    TRIAL_COUNT_COL:
-        st.column_config.NumberColumn(
-            "全体試行回数",
-            disabled=True,
-            width="small"
-        ),
-
-    PERCENT_COL:
-        st.column_config.NumberColumn(
-            "○割合",
-            disabled=True,
-            format="%.1f%%",
-            width="small"
         )
 }
 
 
-# =========================================================
-# ○ / × 選択欄
-# =========================================================
-
+# ○ / ×
 for col in trial_columns:
 
     column_config[col] = (
@@ -940,12 +726,13 @@ for col in trial_columns:
 
 
 # =========================================================
-# 表
+# 編集表
 # =========================================================
 
 st.subheader(
     "📊 表計算エリア"
 )
+
 
 edited_df = st.data_editor(
 
@@ -964,7 +751,7 @@ edited_df = st.data_editor(
 
 
 # =========================================================
-# 編集結果を再計算
+# 編集結果を保存
 # =========================================================
 
 edited_df = normalize_data(
@@ -979,17 +766,133 @@ edited_df = auto_add_trial_column(
     edited_df
 )
 
-edited_df = calculate_summary(
-    edited_df
-)
-
 st.session_state.df = (
     edited_df
 )
 
 
 # =========================================================
-# 入力結果の色
+# ○割合の計算
+# =========================================================
+
+trial_columns = (
+    get_trial_columns(
+        st.session_state.df
+    )
+)
+
+# 全体試行回数
+if trial_columns:
+
+    max_trial = max(
+        int(column)
+        for column in trial_columns
+    )
+
+else:
+
+    max_trial = 0
+
+
+# =========================================================
+# 項目ごとの集計
+# =========================================================
+
+summary_rows = []
+
+
+for row in range(
+    0,
+    len(st.session_state.df),
+    2
+):
+
+    item_name = (
+        st.session_state.df.at[
+            row,
+            ITEM_COL
+        ]
+    )
+
+    # ○の数
+    o_count = 0
+
+    for col in trial_columns:
+
+        value = (
+            st.session_state.df.at[
+                row,
+                col
+            ]
+        )
+
+        if value == "○":
+
+            o_count += 1
+
+    # 割合
+    if max_trial > 0:
+
+        percentage = (
+            o_count /
+            max_trial
+        ) * 100
+
+    else:
+
+        percentage = 0.0
+
+    summary_rows.append(
+        {
+            "項目名":
+                item_name,
+
+            "○の数":
+                o_count,
+
+            "全体試行回数":
+                max_trial,
+
+            "○割合":
+                percentage
+        }
+    )
+
+
+summary_df = pd.DataFrame(
+    summary_rows
+)
+
+
+# =========================================================
+# 集計結果
+# =========================================================
+
+st.subheader(
+    "📈 集計結果"
+)
+
+
+# ここが今回の重要部分
+# ○の数・全体試行回数・割合を必ず別表として表示
+
+st.dataframe(
+
+    summary_df.style.format(
+        {
+            "○割合":
+                "{:.1f}%"
+        }
+    ),
+
+    use_container_width=True,
+
+    hide_index=True
+)
+
+
+# =========================================================
+# ○ / × の色表示
 # =========================================================
 
 st.subheader(
@@ -1002,16 +905,16 @@ def color_value(value):
     if value == "○":
 
         return (
-            "color: red; "
-            "font-weight: bold; "
+            "color: red;"
+            "font-weight: bold;"
             "text-align: center;"
         )
 
     if value == "×":
 
         return (
-            "color: blue; "
-            "font-weight: bold; "
+            "color: blue;"
+            "font-weight: bold;"
             "text-align: center;"
         )
 
@@ -1027,6 +930,7 @@ colored_df = (
     )
 )
 
+
 st.dataframe(
     colored_df,
     use_container_width=True,
@@ -1035,17 +939,13 @@ st.dataframe(
 
 
 # =========================================================
-# 保存
+# Excel保存
 # =========================================================
 
 st.subheader(
-    "💾 データ保存"
+    "💾 保存"
 )
 
-
-# ---------------------------------------------------------
-# Excel
-# ---------------------------------------------------------
 
 try:
 
@@ -1056,10 +956,18 @@ try:
         engine="openpyxl"
     ) as writer:
 
+        # 入力データ
         st.session_state.df.to_excel(
             writer,
             index=False,
             sheet_name="試行管理表"
+        )
+
+        # 集計結果
+        summary_df.to_excel(
+            writer,
+            index=False,
+            sheet_name="集計結果"
         )
 
     excel_buffer.seek(0)
@@ -1078,7 +986,7 @@ try:
             ".spreadsheetml.sheet"
         ),
 
-        key="excel_save"
+        key="excel_download"
     )
 
 except Exception as e:
@@ -1088,9 +996,9 @@ except Exception as e:
     )
 
 
-# ---------------------------------------------------------
-# CSV
-# ---------------------------------------------------------
+# =========================================================
+# CSV保存
+# =========================================================
 
 try:
 
@@ -1112,7 +1020,7 @@ try:
 
         mime="text/csv",
 
-        key="csv_save"
+        key="csv_download"
     )
 
 except Exception as e:
@@ -1132,44 +1040,35 @@ with st.expander(
 
     st.write(
         """
-### 基本
+### 入力
 
-- 1行1列は空白
-- 1行目に1、2、3、4……と試行番号
-- 項目名を入力
-- 試行セルは「空欄 / ○ / ×」から選択
-- 判定行の下がメモ欄
-- ○は赤
-- ×は青
-
-### 自動追加
-
-- 最後の試行列に入力すると、新しい試行列を自動追加
-- 最後の項目に入力すると、新しい項目を自動追加
+1. 項目名を入力
+2. 試行番号のセルをクリック
+3. 「○」「×」「空欄」から選択
+4. 判定行の下にメモを入力
 
 ### 集計
 
-- 1行目の数字の最大値 = 全体試行回数
-- 各項目の「○の数」を自動計算
-- 各項目の「○割合」を自動計算
+例えば
 
-例：
-
-試行回数が 1～5 で、
-
-○ × ○ ○ ×
+1  2  3  4  5
+○  ×  ○  ○  ×
 
 なら、
 
-○の数 = 3
-全体試行回数 = 5
-○割合 = 60.0%
+○の数 → 3
+全体試行回数 → 5
+○割合 → 60.0%
 
 となります。
 
-### 保存
+### 自動追加
 
-ExcelまたはCSVで保存できます。
+最後の試行列に入力すると、
+次の試行列が自動的に追加されます。
+
+最後の項目に入力すると、
+次の項目が自動的に追加されます。
         """
     )
     
