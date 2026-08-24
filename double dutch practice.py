@@ -55,7 +55,7 @@ supabase = get_supabase()
 
 
 # =========================================================
-# 初期データ作成
+# 初期データ
 # =========================================================
 
 def create_initial_data(
@@ -93,7 +93,6 @@ def create_initial_data(
         }
 
         for col in trial_columns:
-
             choice_row[col] = ""
             memo_row[col] = ""
 
@@ -130,7 +129,6 @@ def normalize_data(df):
 
     df = df.copy()
 
-    # 不要列
     df = df.drop(
         columns=[
             "index",
@@ -139,14 +137,12 @@ def normalize_data(df):
         errors="ignore"
     )
 
-    # 必須列
     if ITEM_COL not in df.columns:
         df[ITEM_COL] = ""
 
     if TYPE_COL not in df.columns:
         df[TYPE_COL] = ""
 
-    # 試行列
     trial_columns = get_trial_columns(df)
 
     if not trial_columns:
@@ -154,7 +150,6 @@ def normalize_data(df):
 
     trial_columns = get_trial_columns(df)
 
-    # データを文字列に統一
     for col in trial_columns:
 
         df[col] = (
@@ -163,7 +158,7 @@ def normalize_data(df):
             .astype(str)
         )
 
-    # 判定 / メモ
+    # 行の種類を固定
     for row in range(len(df)):
 
         if row % 2 == 0:
@@ -203,7 +198,6 @@ def normalize_data(df):
                 ITEM_COL
             ] = MEMO
 
-    # 列順
     trial_columns = get_trial_columns(df)
 
     columns = (
@@ -211,16 +205,11 @@ def normalize_data(df):
         + trial_columns
     )
 
-    for col in columns:
-
-        if col not in df.columns:
-            df[col] = ""
-
     return df[columns]
 
 
 # =========================================================
-# Supabase読み込み
+# Supabaseから読み込み
 # =========================================================
 
 def load_data():
@@ -235,13 +224,14 @@ def load_data():
             .execute()
         )
 
+        # データが存在しない場合
         if not result.data:
 
             return create_initial_data()
 
         saved_data = result.data[0]["data"]
 
-        # 初期状態
+        # 初期データしかない場合
         if (
             isinstance(saved_data, dict)
             and saved_data.get(
@@ -255,9 +245,7 @@ def load_data():
             saved_data
         )
 
-        return normalize_data(
-            df
-        )
+        return normalize_data(df)
 
     except Exception as e:
 
@@ -269,22 +257,20 @@ def load_data():
 
 
 # =========================================================
-# Supabase保存
+# Supabaseへ保存
 # =========================================================
 
 def save_data(df):
 
     try:
 
-        df = normalize_data(
-            df
-        )
+        df = normalize_data(df)
 
         data = df.to_dict(
             orient="records"
         )
 
-        (
+        result = (
             supabase
             .table("app_data")
             .upsert(
@@ -308,13 +294,19 @@ def save_data(df):
 
 
 # =========================================================
-# 初回読み込み
+# 起動時だけSupabaseから読み込み
 # =========================================================
 
-if "df" not in st.session_state:
+if "loaded_from_supabase" not in st.session_state:
 
     st.session_state.df = load_data()
 
+    st.session_state.loaded_from_supabase = True
+
+
+# =========================================================
+# データ整理
+# =========================================================
 
 st.session_state.df = normalize_data(
     st.session_state.df
@@ -340,32 +332,21 @@ if st.sidebar.button(
 
     df = st.session_state.df.copy()
 
-    trial_columns = get_trial_columns(
-        df
-    )
+    trial_columns = get_trial_columns(df)
 
-    item_number = (
-        len(df) // 2 + 1
-    )
+    item_number = len(df) // 2 + 1
 
     choice = {
-        ITEM_COL:
-            f"{item_number}回目",
-
-        TYPE_COL:
-            "判定"
+        ITEM_COL: f"{item_number}回目",
+        TYPE_COL: "判定"
     }
 
     memo = {
-        ITEM_COL:
-            MEMO,
-
-        TYPE_COL:
-            MEMO
+        ITEM_COL: MEMO,
+        TYPE_COL: MEMO
     }
 
     for col in trial_columns:
-
         choice[col] = ""
         memo[col] = ""
 
@@ -382,15 +363,11 @@ if st.sidebar.button(
         ignore_index=True
     )
 
-    df = normalize_data(
-        df
-    )
+    df = normalize_data(df)
 
     st.session_state.df = df
 
-    save_data(
-        df
-    )
+    save_data(df)
 
     st.rerun()
 
@@ -413,22 +390,15 @@ if st.sidebar.button(
 
     else:
 
-        # 最後の項目を削除
-        df = df.iloc[
-            :-2
-        ].reset_index(
+        df = df.iloc[:-2].reset_index(
             drop=True
         )
 
-        df = normalize_data(
-            df
-        )
+        df = normalize_data(df)
 
         st.session_state.df = df
 
-        save_data(
-            df
-        )
+        save_data(df)
 
         st.rerun()
 
@@ -443,9 +413,7 @@ if st.sidebar.button(
 
     df = st.session_state.df.copy()
 
-    trial_columns = get_trial_columns(
-        df
-    )
+    trial_columns = get_trial_columns(df)
 
     if trial_columns:
 
@@ -460,19 +428,13 @@ if st.sidebar.button(
 
         new_column = "1"
 
-    if new_column not in df.columns:
+    df[new_column] = ""
 
-        df[new_column] = ""
-
-    df = normalize_data(
-        df
-    )
+    df = normalize_data(df)
 
     st.session_state.df = df
 
-    save_data(
-        df
-    )
+    save_data(df)
 
     st.rerun()
 
@@ -487,9 +449,7 @@ if st.sidebar.button(
 
     df = st.session_state.df.copy()
 
-    trial_columns = get_trial_columns(
-        df
-    )
+    trial_columns = get_trial_columns(df)
 
     if len(trial_columns) <= 1:
 
@@ -499,24 +459,17 @@ if st.sidebar.button(
 
     else:
 
-        # 最後の回数列を削除
         last_column = trial_columns[-1]
 
         df = df.drop(
-            columns=[
-                last_column
-            ]
+            columns=[last_column]
         )
 
-        df = normalize_data(
-            df
-        )
+        df = normalize_data(df)
 
         st.session_state.df = df
 
-        save_data(
-            df
-        )
+        save_data(df)
 
         st.rerun()
 
@@ -533,9 +486,7 @@ if st.sidebar.button(
 
     st.session_state.df = new_df
 
-    save_data(
-        new_df
-    )
+    save_data(new_df)
 
     st.rerun()
 
@@ -561,14 +512,9 @@ if st.sidebar.button(
 # 入力エリア
 # =========================================================
 
-df = normalize_data(
-    st.session_state.df
-)
+df = st.session_state.df.copy()
 
-trial_columns = get_trial_columns(
-    df
-)
-
+trial_columns = get_trial_columns(df)
 
 st.subheader(
     "🪢 入力エリア"
@@ -580,18 +526,12 @@ st.subheader(
 # =========================================================
 
 header_columns = st.columns(
-    [2] + [1] * len(
-        trial_columns
-    )
+    [2] + [1] * len(trial_columns)
 )
-
 
 with header_columns[0]:
 
-    st.markdown(
-        "**回数**"
-    )
-
+    st.markdown("**回数**")
 
 for i, col in enumerate(
     trial_columns,
@@ -606,15 +546,10 @@ for i, col in enumerate(
 
 
 # =========================================================
-# 編集用DataFrame
+# 入力処理
 # =========================================================
 
 new_df = df.copy()
-
-
-# =========================================================
-# 表
-# =========================================================
 
 for item_index in range(
     0,
@@ -627,11 +562,8 @@ for item_index in range(
     # =====================================================
 
     choice_columns = st.columns(
-        [2] + [1] * len(
-            trial_columns
-        )
+        [2] + [1] * len(trial_columns)
     )
-
 
     # 回数
     with choice_columns[0]:
@@ -653,7 +585,6 @@ for item_index in range(
             ITEM_COL
         ] = item_name
 
-
     # ○ / ×
     for i, col in enumerate(
         trial_columns,
@@ -669,19 +600,14 @@ for item_index in range(
                 ]
             )
 
-            if current_value not in [
-                "",
-                "○",
-                "×"
-            ]:
-
-                current_value = ""
-
             options = [
                 "",
                 "○",
                 "×"
             ]
+
+            if current_value not in options:
+                current_value = ""
 
             selected = st.selectbox(
                 f"判定_{item_index}_{col}",
@@ -689,11 +615,7 @@ for item_index in range(
                 index=options.index(
                     current_value
                 ),
-                key=(
-                    f"choice_"
-                    f"{item_index}_"
-                    f"{col}"
-                ),
+                key=f"choice_{item_index}_{col}",
                 label_visibility="collapsed"
             )
 
@@ -702,17 +624,13 @@ for item_index in range(
                 col
             ] = selected
 
-
     # =====================================================
-    # メモ
+    # メモ行
     # =====================================================
 
     memo_columns = st.columns(
-        [2] + [1] * len(
-            trial_columns
-        )
+        [2] + [1] * len(trial_columns)
     )
-
 
     with memo_columns[0]:
 
@@ -720,14 +638,11 @@ for item_index in range(
             "📝 **メモ**"
         )
 
-
     new_df.at[
         item_index + 1,
         ITEM_COL
     ] = MEMO
 
-
-    # メモ自由入力
     for i, col in enumerate(
         trial_columns,
         start=1
@@ -743,11 +658,7 @@ for item_index in range(
                         col
                     ]
                 ),
-                key=(
-                    f"memo_"
-                    f"{item_index}_"
-                    f"{col}"
-                ),
+                key=f"memo_{item_index}_{col}",
                 label_visibility="collapsed"
             )
 
@@ -756,28 +667,24 @@ for item_index in range(
                 col
             ] = memo_value
 
-
     st.divider()
 
 
 # =========================================================
-# 保存
+# 編集結果
 # =========================================================
 
-def normalize_data(data):
-    # 単体の辞書データ（1件）ならリスト [data] にしてDataFrame化
-    if isinstance(data, dict):
-        return pd.DataFrame([data])
-    # すでにDataFrameの場合はそのまま返す
-    elif isinstance(data, pd.DataFrame):
-        return data
-    # その他のデータ型の場合も安全にDataFrame化
-    return pd.DataFrame(data)
+new_df = normalize_data(
+    new_df
+)
 
-
-# 処理呼び出し部分（そのまま使用可能です）
-new_df = normalize_data(new_df)
 st.session_state.df = new_df
+
+
+# =========================================================
+# 自動保存
+# =========================================================
+
 save_data(new_df)
 
 
@@ -788,7 +695,6 @@ save_data(new_df)
 trial_columns = get_trial_columns(
     new_df
 )
-
 
 if trial_columns:
 
@@ -803,7 +709,6 @@ else:
 
 
 summary_rows = []
-
 
 for row in range(
     0,
@@ -827,7 +732,6 @@ for row in range(
 
             o_count += 1
 
-
     if max_trial > 0:
 
         success_rate = (
@@ -838,7 +742,6 @@ for row in range(
     else:
 
         success_rate = 0.0
-
 
     summary_rows.append(
         {
@@ -870,18 +773,14 @@ st.subheader(
     "📈 集計結果"
 )
 
-
 st.dataframe(
-
     summary_df.style.format(
         {
             "成功確率":
                 "{:.1f}%"
         }
     ),
-
     use_container_width=True,
-
     hide_index=True
 )
 
@@ -894,13 +793,9 @@ st.subheader(
     "🎨 入力結果"
 )
 
-
 result_df = new_df.copy()
 
-
-# 成功確率列
 result_df["成功確率"] = ""
-
 
 for index in range(
     0,
@@ -930,25 +825,19 @@ for index in range(
     result_df.at[
         index,
         "成功確率"
-    ] = (
-        f"{rate:.1f}%"
-    )
+    ] = f"{rate:.1f}%"
 
 
 result_df = result_df.drop(
-    columns=[
-        TYPE_COL
-    ]
+    columns=[TYPE_COL]
 )
 
 
 # =========================================================
-# 色表示
+# 色
 # =========================================================
 
-def color_value(
-    value
-):
+def color_value(value):
 
     if value == "○":
 
@@ -994,7 +883,6 @@ st.subheader(
     "📥 ファイルとして保存"
 )
 
-
 try:
 
     excel_buffer = io.BytesIO()
@@ -1019,22 +907,16 @@ try:
     excel_buffer.seek(0)
 
     st.download_button(
-
         label="📊 Excelとして保存",
-
         data=excel_buffer.getvalue(),
-
         file_name="成功確率表.xlsx",
-
         mime=(
             "application/"
             "vnd.openxmlformats-officedocument"
             ".spreadsheetml.sheet"
         ),
-
         key="excel_download"
     )
-
 
 except Exception as e:
 
@@ -1058,18 +940,12 @@ try:
     )
 
     st.download_button(
-
         label="📥 CSVとして保存",
-
         data=csv_data,
-
         file_name="成功確率表.csv",
-
         mime="text/csv",
-
         key="csv_download"
     )
-
 
 except Exception as e:
 
@@ -1089,5 +965,5 @@ st.sidebar.success(
 )
 
 st.sidebar.caption(
-    "ブラウザを閉じてもSupabaseに保存されています。"
+    "ブラウザを閉じたりリロードしても保存データは残ります。"
 )
