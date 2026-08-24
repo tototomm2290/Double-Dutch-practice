@@ -764,15 +764,21 @@ for item_index in range(
 # 保存
 # =========================================================
 
-new_df = normalize_data(
-    new_df
-)
+def normalize_data(data):
+    # 単体の辞書データ（1件）ならリスト [data] にしてDataFrame化
+    if isinstance(data, dict):
+        return pd.DataFrame([data])
+    # すでにDataFrameの場合はそのまま返す
+    elif isinstance(data, pd.DataFrame):
+        return data
+    # その他のデータ型の場合も安全にDataFrame化
+    return pd.DataFrame(data)
 
+
+# 処理呼び出し部分（そのまま使用可能です）
+new_df = normalize_data(new_df)
 st.session_state.df = new_df
-
-save_data(
-    new_df
-)
+save_data(new_df)
 
 
 # =========================================================
