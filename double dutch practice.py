@@ -9,12 +9,12 @@ from supabase import create_client
 # =========================================================
 
 st.set_page_config(
-    page_title="○×試行管理表",
+    page_title="○×練習",
     page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 ○×試行管理表")
+st.title("📊 ○×練習")
 
 
 # =========================================================
