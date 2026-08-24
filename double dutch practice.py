@@ -935,31 +935,17 @@ except Exception as e:
 # =========================================================
 
 try:
-
-    csv_data = (
-        st.session_state.df
-        .to_csv(
-            index=False,
-            encoding="utf-8-sig"
-        )
-    )
+    csv_data = st.session_state.df.to_csv(index=False).encode("utf-8-sig")
 
     st.download_button(
-
         label="📥 CSVとして保存",
-
         data=csv_data,
-
         file_name="○×試行管理表.csv",
-
         mime="text/csv",
-
-        key="csv_download"
+        key="csv_download",
     )
 
 except Exception as e:
-
-    st.error(
-        f"CSV保存エラー: {e}"
-    )
+    st.error(f"CSV保存エラー: {e}")
+    
     
