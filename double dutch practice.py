@@ -89,13 +89,19 @@ def create_initial_data(
 
     for i in range(item_count):
 
+        # ---------------------------------------------
         # 判定行
+        # ---------------------------------------------
+
         choice_row = {
             ITEM_COL: f"{i + 1}回目",
             TYPE_COL: "判定"
         }
 
+        # ---------------------------------------------
         # メモ行
+        # ---------------------------------------------
+
         memo_row = {
             ITEM_COL: MEMO,
             TYPE_COL: MEMO
@@ -139,7 +145,7 @@ def normalize_data(df):
 
     df = df.copy()
 
-    # 不要な列
+    # 不要な列を削除
     df = df.drop(
         columns=[
             "index",
@@ -175,7 +181,10 @@ def normalize_data(df):
             .astype(str)
         )
 
+    # ---------------------------------------------
     # 判定行 / メモ行
+    # ---------------------------------------------
+
     for row in range(len(df)):
 
         if row % 2 == 0:
@@ -219,7 +228,10 @@ def normalize_data(df):
                 ITEM_COL
             ] = MEMO
 
+    # ---------------------------------------------
     # 列順
+    # ---------------------------------------------
+
     trial_columns = get_trial_columns(df)
 
     columns = (
@@ -256,7 +268,7 @@ def load_data():
         )
 
         # ---------------------------------------------
-        # データが存在しない場合
+        # データが存在しない
         # ---------------------------------------------
 
         if not result.data:
@@ -272,7 +284,7 @@ def load_data():
         )
 
         # ---------------------------------------------
-        # None / 空の場合
+        # None / 空
         # ---------------------------------------------
 
         if not saved_data:
@@ -288,14 +300,14 @@ def load_data():
             dict
         ):
 
-            # 初期データ
+            # 初期状態
             if saved_data.get(
                 "initialized"
             ) is True:
 
                 return create_initial_data()
 
-            # 辞書1件だけの場合
+            # 辞書1件
             df = pd.DataFrame(
                 [saved_data]
             )
@@ -318,20 +330,14 @@ def load_data():
             )
 
         # ---------------------------------------------
-        # 3. 想定外の型
+        # 3. その他
         # ---------------------------------------------
 
         else:
 
             return create_initial_data()
 
-        # ---------------------------------------------
-        # データ整理
-        # ---------------------------------------------
-
-        return normalize_data(
-            df
-        )
+        return normalize_data(df)
 
     except Exception as e:
 
@@ -354,7 +360,6 @@ def save_data(df):
             df
         )
 
-        # DataFrame → JSON
         data = df.to_dict(
             orient="records"
         )
@@ -400,7 +405,7 @@ if (
 
 
 # =========================================================
-# 取得したデータを安全に正規化
+# 取得したデータを正規化
 # =========================================================
 
 st.session_state.df = normalize_data(
@@ -482,9 +487,7 @@ if st.sidebar.button(
 
     st.session_state.df = df
 
-    save_data(
-        df
-    )
+    save_data(df)
 
     st.rerun()
 
@@ -510,8 +513,7 @@ if st.sidebar.button(
 
     else:
 
-        # 最後の項目
-        # 判定行＋メモ行
+        # 最後の項目を削除
         df = (
             df.iloc[:-2]
             .reset_index(
@@ -525,9 +527,7 @@ if st.sidebar.button(
 
         st.session_state.df = df
 
-        save_data(
-            df
-        )
+        save_data(df)
 
         st.rerun()
 
@@ -572,9 +572,7 @@ if st.sidebar.button(
 
     st.session_state.df = df
 
-    save_data(
-        df
-    )
+    save_data(df)
 
     st.rerun()
 
@@ -620,9 +618,7 @@ if st.sidebar.button(
 
         st.session_state.df = df
 
-        save_data(
-            df
-        )
+        save_data(df)
 
         st.rerun()
 
@@ -639,9 +635,7 @@ if st.sidebar.button(
 
     st.session_state.df = new_df
 
-    save_data(
-        new_df
-    )
+    save_data(new_df)
 
     st.rerun()
 
@@ -917,22 +911,6 @@ trial_columns = (
 )
 
 
-# ---------------------------------------------------------
-# 全体試行回数
-# ---------------------------------------------------------
-
-if trial_columns:
-
-    max_trial = max(
-        int(c)
-        for c in trial_columns
-    )
-
-else:
-
-    max_trial = 0
-
-
 # =========================================================
 # 項目ごとの集計
 # =========================================================
@@ -961,27 +939,56 @@ for row in range(
     o_count = 0
 
 
+    # -----------------------------------------------------
+    # ×の数
+    # -----------------------------------------------------
+
+    x_count = 0
+
+
+    # -----------------------------------------------------
+    # 入力済みの回数
+    #
+    # 空欄は数えない
+    # ○と×だけを数える
+    # -----------------------------------------------------
+
+    input_count = 0
+
+
     for col in trial_columns:
 
-        if (
+        value = (
             new_df.at[
                 row,
                 col
-            ] == "○"
-        ):
+            ]
+        )
+
+
+        if value == "○":
 
             o_count += 1
+
+            input_count += 1
+
+
+        elif value == "×":
+
+            x_count += 1
+
+            input_count += 1
 
 
     # -----------------------------------------------------
     # 成功確率
     # -----------------------------------------------------
 
-    if max_trial > 0:
+    if input_count > 0:
 
         success_rate = (
             o_count /
-            max_trial
+            input_count
         ) * 100
 
     else:
@@ -997,8 +1004,11 @@ for row in range(
             "○の数":
                 o_count,
 
-            "全体試行回数":
-                max_trial,
+            "×の数":
+                x_count,
+
+            "入力済み回数":
+                input_count,
 
             "成功確率":
                 success_rate
@@ -1009,6 +1019,22 @@ for row in range(
 summary_df = pd.DataFrame(
     summary_rows
 )
+
+
+# =========================================================
+# 全体の回数
+# =========================================================
+
+if trial_columns:
+
+    total_trial_count = max(
+        int(c)
+        for c in trial_columns
+    )
+
+else:
+
+    total_trial_count = 0
 
 
 # =========================================================
@@ -1048,9 +1074,7 @@ result_df = new_df.copy()
 
 
 # 成功確率列
-result_df[
-    "成功確率"
-] = ""
+result_df["成功確率"] = ""
 
 
 for index in range(
@@ -1059,22 +1083,46 @@ for index in range(
     2
 ):
 
-    o_count = sum(
+    # ○
+    o_count = 0
 
-        result_df.at[
-            index,
-            col
-        ] == "○"
+    # ×
+    x_count = 0
 
-        for col in trial_columns
-    )
+    # 実際に入力された数
+    input_count = 0
 
 
-    if max_trial > 0:
+    for col in trial_columns:
+
+        value = (
+            result_df.at[
+                index,
+                col
+            ]
+        )
+
+
+        if value == "○":
+
+            o_count += 1
+
+            input_count += 1
+
+
+        elif value == "×":
+
+            x_count += 1
+
+            input_count += 1
+
+
+    # 成功確率
+    if input_count > 0:
 
         rate = (
             o_count /
-            max_trial
+            input_count
         ) * 100
 
     else:
@@ -1090,7 +1138,7 @@ for index in range(
     )
 
 
-# 種類列非表示
+# 種類列を削除
 result_df = result_df.drop(
     columns=[
         TYPE_COL
@@ -1162,7 +1210,6 @@ try:
     ) as writer:
 
 
-        # 入力結果
         result_df.to_excel(
 
             writer,
@@ -1173,7 +1220,6 @@ try:
         )
 
 
-        # 集計結果
         summary_df.to_excel(
 
             writer,
@@ -1259,7 +1305,7 @@ except Exception as e:
 
 
 # =========================================================
-# 状態表示
+# 状態
 # =========================================================
 
 st.sidebar.divider()
@@ -1273,4 +1319,3 @@ st.sidebar.success(
 st.sidebar.caption(
     "ブラウザを閉じたりリロードしてもデータは残ります。"
 )
-    
