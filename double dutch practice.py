@@ -9,12 +9,12 @@ from supabase import create_client
 # =========================================================
 
 st.set_page_config(
-    page_title="○×試行管理表",
-    page_icon="📊",
+    page_title="○×練習法",
+    page_icon="🪢",
     layout="wide"
 )
 
-st.title("📊 ○×試行管理表")
+st.title("🪢 ○×練習法")
 
 
 # =========================================================
@@ -49,7 +49,7 @@ supabase = get_supabase()
 # 定数
 # =========================================================
 
-ITEM_COL = "項目名"
+ITEM_COL = "回数"
 TYPE_COL = "種類"
 MEMO = "メモ"
 
@@ -503,7 +503,7 @@ st.sidebar.header("操作")
 # =========================================================
 
 if st.sidebar.button(
-    "➕ 行を追加"
+    "➕ 項目を追加"
 ):
 
     df = st.session_state.df.copy()
@@ -560,7 +560,7 @@ if st.sidebar.button(
 # =========================================================
 
 if st.sidebar.button(
-    "➕ 試行列を追加"
+    "➕ 回数の追加"
 ):
 
     df = st.session_state.df.copy()
@@ -641,7 +641,7 @@ df = normalize_data(
 # =========================================================
 
 st.subheader(
-    "📊 表計算エリア"
+    "📊 入力エリア"
 )
 
 trial_columns = get_trial_columns(
