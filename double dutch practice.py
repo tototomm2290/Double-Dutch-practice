@@ -2,7 +2,7 @@ import io
 import streamlit as st
 import pandas as pd
 from supabase import create_client
-st.write(list(st.secrets.keys()))
+# st.write(list(st.secrets.keys()))
 
 
 
