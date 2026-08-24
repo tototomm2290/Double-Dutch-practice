@@ -1,9 +1,8 @@
 import io
 import streamlit as st
 import pandas as pd
-from supabase import create_client
-# st.write(list(st.secrets.keys()))
 
+from supabase import create_client
 
 
 # =========================================================
@@ -11,12 +10,12 @@ from supabase import create_client
 # =========================================================
 
 st.set_page_config(
-    page_title="○×練習",
+    page_title="○×練習法",
     page_icon="📊",
     layout="wide"
 )
 
-st.title("📊 ○×練習")
+st.title("📊 ○×練習法")
 
 
 # =========================================================
@@ -25,6 +24,7 @@ st.title("📊 ○×練習")
 
 ITEM_COL = "項目名"
 TYPE_COL = "種類"
+
 MEMO = "メモ"
 
 
@@ -34,6 +34,18 @@ MEMO = "メモ"
 
 @st.cache_resource
 def get_supabase():
+
+    if "SUPABASE_URL" not in st.secrets:
+        st.error(
+            "SUPABASE_URL が設定されていません。"
+        )
+        st.stop()
+
+    if "SUPABASE_KEY" not in st.secrets:
+        st.error(
+            "SUPABASE_KEY が設定されていません。"
+        )
+        st.stop()
 
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_KEY"]
@@ -123,7 +135,7 @@ def normalize_data(df):
 
     df = df.copy()
 
-    # 不要列を削除
+    # 不要列
     df = df.drop(
         columns=[
             "index",
@@ -151,7 +163,7 @@ def normalize_data(df):
 
     trial_columns = get_trial_columns(df)
 
-    # ○ / × / 空欄以外を消す
+    # ○ / × / 空欄
     for col in trial_columns:
 
         df[col] = (
@@ -168,7 +180,7 @@ def normalize_data(df):
                 "○",
                 "×"
             ]
-            else ""
+            else value
         )
 
     # 判定行 / メモ行
@@ -196,7 +208,9 @@ def normalize_data(df):
                 df.at[
                     row,
                     ITEM_COL
-                ] = f"項目{row // 2 + 1}"
+                ] = (
+                    f"項目{row // 2 + 1}"
+                )
 
         else:
 
@@ -210,7 +224,7 @@ def normalize_data(df):
                 ITEM_COL
             ] = MEMO
 
-    # 列の順番
+    # 列順
     trial_columns = get_trial_columns(df)
 
     columns = (
@@ -222,7 +236,7 @@ def normalize_data(df):
 
 
 # =========================================================
-# 最後の列に入力したら自動追加
+# 最後の列に ○ / × が入ったら列追加
 # =========================================================
 
 def auto_add_trial_column(df):
@@ -239,28 +253,58 @@ def auto_add_trial_column(df):
 
     last_column = trial_columns[-1]
 
-    # 最後の列に入力があるか
-    used = (
-        df[last_column]
-        .astype(str)
-        .str.strip()
-        .ne("")
-        .any()
+    # -----------------------------------------
+    # 重要
+    #
+    # 「最後の列の判定行」だけを見る
+    #
+    # 項目名やメモは一切見ない
+    # -----------------------------------------
+
+    choice_rows = list(
+        range(
+            0,
+            len(df),
+            2
+        )
     )
 
-    if used:
+    should_add = False
+
+    for row in choice_rows:
+
+        value = str(
+            df.at[
+                row,
+                last_column
+            ]
+        )
+
+        # ○または×が入った時だけ追加
+        if value in [
+            "○",
+            "×"
+        ]:
+
+            should_add = True
+            break
+
+    if should_add:
 
         new_column = str(
             int(last_column) + 1
         )
 
-        df[new_column] = ""
+        # 既に存在する場合は追加しない
+        if new_column not in df.columns:
+
+            df[new_column] = ""
 
     return df
 
 
 # =========================================================
-# 最後の項目に入力したら自動追加
+# 最後の項目に入力されたら行追加
 # =========================================================
 
 def auto_add_item(df):
@@ -277,7 +321,10 @@ def auto_add_item(df):
 
     used = False
 
+    # -----------------------------------------
     # 項目名
+    # -----------------------------------------
+
     item_name = str(
         df.at[
             last_choice_row,
@@ -289,6 +336,7 @@ def auto_add_item(df):
         f"項目{last_choice_row // 2 + 1}"
     )
 
+    # 最後の項目名を変更した場合
     if (
         item_name.strip() != ""
         and item_name != default_name
@@ -296,7 +344,10 @@ def auto_add_item(df):
 
         used = True
 
-    # ○ / ×
+    # -----------------------------------------
+    # 判定
+    # -----------------------------------------
+
     if not used:
 
         for col in trial_columns:
@@ -308,12 +359,18 @@ def auto_add_item(df):
                 ]
             )
 
-            if value.strip() != "":
+            if value in [
+                "○",
+                "×"
+            ]:
 
                 used = True
                 break
 
+    # -----------------------------------------
     # メモ
+    # -----------------------------------------
+
     if not used:
 
         for col in trial_columns:
@@ -330,7 +387,10 @@ def auto_add_item(df):
                 used = True
                 break
 
+    # -----------------------------------------
     # 新しい項目を追加
+    # -----------------------------------------
+
     if used:
 
         item_number = (
@@ -358,15 +418,17 @@ def auto_add_item(df):
             choice[col] = ""
             memo[col] = ""
 
+        new_rows = pd.DataFrame(
+            [
+                choice,
+                memo
+            ]
+        )
+
         df = pd.concat(
             [
                 df,
-                pd.DataFrame(
-                    [
-                        choice,
-                        memo
-                    ]
-                )
+                new_rows
             ],
             ignore_index=True
         )
@@ -390,17 +452,22 @@ def load_data():
             .execute()
         )
 
-        # データがまだ存在しない
+        # データが存在しない
         if not result.data:
 
             return create_initial_data()
 
         saved_data = result.data[0]["data"]
 
-        # 初期データ
+        # 初期値のみの場合
         if (
-            isinstance(saved_data, dict)
-            and saved_data.get("initialized") is True
+            isinstance(
+                saved_data,
+                dict
+            )
+            and saved_data.get(
+                "initialized"
+            ) is True
         ):
 
             return create_initial_data()
@@ -429,12 +496,14 @@ def save_data(df):
 
     try:
 
+        df = normalize_data(df)
+
         # DataFrame → JSON
         data = df.to_dict(
             orient="records"
         )
 
-        (
+        response = (
             supabase
             .table("app_data")
             .upsert(
@@ -463,13 +532,11 @@ def save_data(df):
 
 if "df" not in st.session_state:
 
-    st.session_state.df = (
-        load_data()
-    )
+    st.session_state.df = load_data()
 
 
 # =========================================================
-# データ整理
+# 初期整理
 # =========================================================
 
 st.session_state.df = normalize_data(
@@ -534,17 +601,18 @@ if st.sidebar.button(
         ignore_index=True
     )
 
-    st.session_state.df = normalize_data(df)
+    df = normalize_data(df)
 
-    save_data(
-        st.session_state.df
-    )
+    st.session_state.df = df
+
+    # 保存
+    save_data(df)
 
     st.rerun()
 
 
 # =========================================================
-# 列追加
+# 試行列追加
 # =========================================================
 
 if st.sidebar.button(
@@ -568,13 +636,16 @@ if st.sidebar.button(
 
         new_column = "1"
 
-    df[new_column] = ""
+    if new_column not in df.columns:
 
-    st.session_state.df = normalize_data(df)
+        df[new_column] = ""
 
-    save_data(
-        st.session_state.df
-    )
+    df = normalize_data(df)
+
+    st.session_state.df = df
+
+    # 保存
+    save_data(df)
 
     st.rerun()
 
@@ -587,13 +658,11 @@ if st.sidebar.button(
     "🔄 新規作成"
 ):
 
-    st.session_state.df = (
-        create_initial_data()
-    )
+    new_df = create_initial_data()
 
-    save_data(
-        st.session_state.df
-    )
+    st.session_state.df = new_df
+
+    save_data(new_df)
 
     st.rerun()
 
@@ -616,18 +685,12 @@ if st.sidebar.button(
 
 
 # =========================================================
-# 自動追加
+# 自動追加処理
 # =========================================================
 
-df = st.session_state.df.copy()
-
-df = normalize_data(df)
-
-df = auto_add_item(df)
-
-df = auto_add_trial_column(df)
-
-st.session_state.df = df
+df_before_edit = (
+    st.session_state.df.copy()
+)
 
 
 # =========================================================
@@ -635,8 +698,9 @@ st.session_state.df = df
 # =========================================================
 
 trial_columns = get_trial_columns(
-    st.session_state.df
+    df_before_edit
 )
+
 
 column_config = {
 
@@ -655,7 +719,7 @@ column_config = {
 }
 
 
-# ○ / × を選択
+# ○ / ×選択
 for col in trial_columns:
 
     column_config[col] = (
@@ -679,9 +743,10 @@ st.subheader(
     "📊 表計算エリア"
 )
 
+
 edited_df = st.data_editor(
 
-    st.session_state.df,
+    df_before_edit,
 
     column_config=column_config,
 
@@ -696,10 +761,19 @@ edited_df = st.data_editor(
 
 
 # =========================================================
-# 編集結果を保存
+# 編集結果処理
 # =========================================================
 
 edited_df = normalize_data(
+    edited_df
+)
+
+
+# =========================================================
+# 自動行追加
+# =========================================================
+
+before_rows = len(
     edited_df
 )
 
@@ -707,19 +781,46 @@ edited_df = auto_add_item(
     edited_df
 )
 
+after_rows = len(
+    edited_df
+)
+
+
+# =========================================================
+# 自動列追加
+# =========================================================
+
+before_columns = (
+    get_trial_columns(
+        edited_df
+    )
+)
+
 edited_df = auto_add_trial_column(
     edited_df
 )
+
+after_columns = (
+    get_trial_columns(
+        edited_df
+    )
+)
+
+
+# =========================================================
+# セッション状態更新
+# =========================================================
 
 st.session_state.df = edited_df
 
 
 # =========================================================
-# 自動保存
+# 編集内容を保存
 # =========================================================
 
+# 編集後のデータをそのまま保存
 save_data(
-    st.session_state.df
+    edited_df
 )
 
 
@@ -731,6 +832,8 @@ trial_columns = get_trial_columns(
     st.session_state.df
 )
 
+
+# 全体試行回数
 if trial_columns:
 
     max_trial = max(
@@ -742,6 +845,10 @@ else:
 
     max_trial = 0
 
+
+# =========================================================
+# 項目別集計
+# =========================================================
 
 summary_rows = []
 
@@ -764,12 +871,14 @@ for row in range(
 
     for col in trial_columns:
 
-        if (
+        value = str(
             st.session_state.df.at[
                 row,
                 col
-            ] == "○"
-        ):
+            ]
+        )
+
+        if value == "○":
 
             o_count += 1
 
@@ -831,7 +940,7 @@ st.dataframe(
 
 
 # =========================================================
-# ○ = 赤、× = 青
+# ○ = 赤 / × = 青
 # =========================================================
 
 st.subheader(
@@ -885,6 +994,7 @@ st.subheader(
     "📥 ファイルとして保存"
 )
 
+
 try:
 
     excel_buffer = io.BytesIO()
@@ -937,17 +1047,45 @@ except Exception as e:
 # =========================================================
 
 try:
-    csv_data = st.session_state.df.to_csv(index=False).encode("utf-8-sig")
+
+    csv_data = (
+        st.session_state.df
+        .to_csv(
+            index=False,
+            encoding="utf-8-sig"
+        )
+    )
 
     st.download_button(
+
         label="📥 CSVとして保存",
+
         data=csv_data,
+
         file_name="○×試行管理表.csv",
+
         mime="text/csv",
-        key="csv_download",
+
+        key="csv_download"
     )
 
 except Exception as e:
-    st.error(f"CSV保存エラー: {e}")
-    
-    
+
+    st.error(
+        f"CSV保存エラー: {e}"
+    )
+
+
+# =========================================================
+# 状態表示
+# =========================================================
+
+st.sidebar.divider()
+
+st.sidebar.info(
+    "入力データは自動的にSupabaseへ保存されます。"
+)
+
+st.sidebar.caption(
+    "ブラウザを閉じても保存データは残ります。"
+)
